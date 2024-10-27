@@ -296,7 +296,6 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
         error_info = None  # 添加错误信息变量
         
         try:
-                    # 在运行前检查DLL加载情况
             check_dll_loading()
             
             # 切换到 bin 目录
@@ -373,9 +372,29 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
                 encoding='utf-8',
                 errors='ignore',
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                cwd=bin_dir,
+                env=os.environ.copy(),
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
             )
-            
+                    # 立即检查进程状态
+            time.sleep(0.1)
+            if current_process.poll() is not None:
+                error_code = process.returncode
+                error_output = process.stderr.read() if process.stderr else ""
+                output = process.stdout.read() if process.stdout else ""
+                
+                error_info = {
+                    'code': error_code,
+                    'stdout': output,
+                    'stderr': error_output,
+                    'command': cmd,
+                    'working_dir': bin_dir,
+                    'system_info': platform.uname()._asdict()
+                }
+                
+                logging.error(f"进程异常退出: {error_info}")
+                return None, error_info
             # 收集所有输出信息
             stdout_data = []
             stderr_data = []

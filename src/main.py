@@ -69,6 +69,7 @@ def get_model_path():
     """获取model目录的路径"""
     return os.path.join(get_app_path(), 'model')
 
+##打包相关
 def resource_path(relative_path):
     """获取资源的绝对路径"""
     try:
@@ -280,55 +281,7 @@ def parse_timestamp(line):
         return None
     return None
 
-def ensure_dlls():
-    """确保所有必要的DLL文件都在bin目录中"""
-    try:
-        # 获取正确的bin目录路径
-        if getattr(sys, 'frozen', False):
-            # 打包后的环境
-            bin_dir = os.path.join(get_app_path(), 'bin')
-        else:
-            # 开发环境
-            bin_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'bin')
-        
-        print(f"当前bin目录: {bin_dir}")
-        
-        # 确保bin目录存在
-        if not os.path.exists(bin_dir):
-            os.makedirs(bin_dir)
-        
-        # 需要的文件列表
-        required_files = [
-            'whisper.dll',
-            'ggml.dll',          # 添加 ggml.dll
-            'MSVCP140.dll',
-            'VCRUNTIME140.dll',
-            'VCRUNTIME140_1.dll',
-            'ffmpeg.exe',
-            'ffprobe.exe',
-            'main.exe'
-        ]
-        
-        # 检查每个必需的文件
-        missing_files = []
-        for file in required_files:
-            file_path = os.path.join(bin_dir, file)
-            if not os.path.exists(file_path):
-                missing_files.append(file)
-                print(f"缺少文件: {file}")
-            else:
-                print(f"找到文件: {file}")
-        
-        if missing_files:
-            error_msg = f"缺少必要的文件: {', '.join(missing_files)}\n请确保这些文件在bin目录中。"
-            messagebox.showerror("错误", error_msg)
-            return False
-            
-        return True
-            
-    except Exception as e:
-        print(f"检查DLL时出错: {e}")
-        return False
+
 
 
 def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
@@ -1125,7 +1078,7 @@ def init_gui():
 
     language_var.trace('w', on_language_change)
 
-    # # 是否翻译
+    # # 停用翻译按钮
     # translate_var = BooleanVar()
     # ttk.Checkbutton(root, text="翻为英文", variable=translate_var).grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
@@ -1246,10 +1199,6 @@ class CreateToolTip(object):
 if __name__ == "__main__":
     # 设置日志
     setup_logging()
-    
-    # 检查必要的文件
-    if not ensure_dlls():
-        sys.exit(1)
     
     try:
         init_gui()

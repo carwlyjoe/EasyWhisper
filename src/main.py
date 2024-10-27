@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import QMainWindow, QAction, QMenu
 from PyQt5.QtCore import QTimer
 from updater import Updater
 import logging
+import traceback
+import tempfile
 
 # 在文件开头定义全局变量
 audio_file_var = None
@@ -205,13 +207,12 @@ def convert_to_16k_wav(audio_file):
         logging.info(f"FFmpeg 路径: {ffmpeg_path}")
         logging.info(f"FFmpeg 是否存在: {os.path.exists(ffmpeg_path)}")
         
-        # 创建临时目录并规范化路径
-        temp_dir = os.path.normpath(os.path.join(os.path.dirname(audio_file), "temp"))
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-        
-        # 生成临时文件路径并规范化
-        temp_file = os.path.normpath(os.path.join(temp_dir, f"temp_{os.path.basename(audio_file)}_16k.wav"))
+        # 在系统临时目录生成临时文件
+        temp_file = os.path.join(
+            tempfile.gettempdir(), 
+            f"whisper_temp_{int(time.time())}_{os.path.basename(audio_file)}_16k.wav"
+        )
+        temp_file = os.path.normpath(temp_file)
         
         cmd = [
             ffmpeg_path,
@@ -292,12 +293,21 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
     def process_whisper():
         json_file_path = None
         result = None
+        error_info = None  # 添加错误信息变量
         
         try:
+                    # 在运行前检查DLL加载情况
+            check_dll_loading()
+            
             # 切换到 bin 目录
             bin_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'bin')
             os.chdir(bin_dir)
             print(f"当前工作目录: {os.getcwd()}")
+
+            os.environ['PATH'] = f"{bin_dir};{os.environ.get('PATH', '')}"
+        
+        # 打印当前PATH环境变量
+            logging.info(f"当前PATH环境变量: {os.environ['PATH']}")
             
             # 规范化路径
             audio_file_norm = os.path.normpath(audio_file)
@@ -366,25 +376,28 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
                 universal_newlines=True
             )
             
+            # 收集所有输出信息
+            stdout_data = []
+            stderr_data = []
+            
             def read_stderr():
-                """专门读取stderr的线程"""
                 while current_process and current_process.poll() is None and not should_stop:
                     line = current_process.stderr.readline()
                     if line:
+                        stderr_data.append(line)  # 保存错误输出
                         print(f"Whisper stderr: {line.strip()}")
                         if "progress =" in line:
                             try:
                                 progress = float(line.split("progress =")[1].strip().replace('%', ''))
-                                print(f"检测到进度: {progress}%")
                                 root.after(1, lambda p=progress: progress_bar.configure(value=min(p, 100)))
                             except Exception as e:
                                 print(f"解析进度失败: {e}")
             
             def read_stdout():
-                """专门读取stdout的线程"""
                 while current_process and current_process.poll() is None and not should_stop:
                     line = current_process.stdout.readline()
                     if line:
+                        stdout_data.append(line)  # 保存标准输出
                         print(f"Whisper stdout: {line.strip()}")
             
             stderr_thread = threading.Thread(target=read_stderr, daemon=True)
@@ -404,7 +417,7 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
                     current_process.wait(timeout=5)
                 except:
                     current_process.kill()
-                return None
+                return None, None
             
             stderr_thread.join(timeout=1)
             stdout_thread.join(timeout=1)
@@ -412,38 +425,53 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
             print(f"进程已结束，返回码: {current_process.returncode}")
             
             if current_process.returncode != 0:
-                print(f"进程异常退出，返回码: {current_process.returncode}")
-                return None
+                error_info = {
+                    'returncode': current_process.returncode,
+                    'stdout': ''.join(stdout_data),
+                    'stderr': ''.join(stderr_data)
+                }
+                logging.error(f"进程异常退出，返回码: {current_process.returncode}")
+                logging.error(f"标准输出: {error_info['stdout']}")
+                logging.error(f"错误输出: {error_info['stderr']}")
+                return None, error_info
             
-            # 读取JSON件
+            # 读取JSON文件
             if os.path.exists(json_file_path):
                 try:
                     with open(json_file_path, "r", encoding="utf-8") as f:
                         result = json.load(f)
-                    print("JSON文件读取成功")
+                    logging.info("JSON文件读取成功")
                 except Exception as e:
-                    print(f"读取JSON文件失败: {e}")
+                    error_info = {
+                        'error': str(e),
+                        'traceback': traceback.format_exc()
+                    }
+                    logging.error(f"读取JSON文件失败: {e}")
                     result = None
             else:
-                print(f"未找到JSON文件: {json_file_path}")
+                error_info = {'error': f"未找到JSON文件: {json_file_path}"}
+                logging.error(f"未找到JSON文件: {json_file_path}")
                 result = None
                 
         except Exception as e:
-            print(f"处理过程出错: {e}")
-            import traceback
-            print(f"错误详情: {traceback.format_exc()}")
+            error_info = {
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }
+            logging.error(f"处理过程出错: {e}")
+            logging.error(f"错误详情: {traceback.format_exc()}")
             result = None
             
         finally:
-            # 删除JSON文件
+            # 清理临时文件
             if json_file_path and os.path.exists(json_file_path):
                 try:
                     os.remove(json_file_path)
-                    print(f"已删除JSON文件: {json_file_path}")
+                    logging.info(f"已删除JSON文件: {json_file_path}")
                 except Exception as e:
-                    print(f"删除JSON文件失败: {e}")
+                    logging.error(f"删除JSON文件失败: {e}")
             
-            return result
+            return result, error_info
     
     # 执行处理并返回结果
     return process_whisper()
@@ -478,17 +506,24 @@ def save_transcription(transcription, output_file):
                 for i, segment in enumerate(transcription, 1):
                     start_time = format_timestamp(segment.get('start', 0))
                     end_time = format_timestamp(segment.get('end', 0))
-                    text = segment.get('text', '').strip()
+                    # 将繁体转换为简体
+                    text = convert(segment.get('text', '').strip(), 'zh-cn')
                     content += f"{i}\n{start_time} --> {end_time}\n{text}\n\n"
             elif ext == '.txt':
-                # 纯文本格式
-                content = "\n".join(segment.get('text', '').strip() for segment in transcription)
+                # 纯文本格式，将所有文本转换为简体
+                content = "\n".join(convert(segment.get('text', '').strip(), 'zh-cn') 
+                                  for segment in transcription)
             else:
-                # JSON 格式
-                content = json.dumps(transcription, ensure_ascii=False, indent=2)
+                # JSON 格式，转换所有文本为简体
+                simplified_transcription = []
+                for segment in transcription:
+                    simplified_segment = segment.copy()
+                    simplified_segment['text'] = convert(segment.get('text', ''), 'zh-cn')
+                    simplified_transcription.append(simplified_segment)
+                content = json.dumps(simplified_transcription, ensure_ascii=False, indent=2)
         else:
-            # 如果不是列表，直接使用字符串
-            content = str(transcription)
+            # 如果不是列表，直接转换为简体
+            content = convert(str(transcription), 'zh-cn')
             
         # 写入文件
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -499,6 +534,56 @@ def save_transcription(transcription, output_file):
     except Exception as e:
         logging.error(f"保存文件时出错", exc_info=True)
         messagebox.showerror("错误", f"保存文件时出错: {str(e)}")
+
+def check_dll_loading():
+    """详细检查DLL加载情况"""
+    import ctypes
+    from ctypes import wintypes, get_last_error
+    
+    bin_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'bin')
+    dlls_to_check = ['vcruntime140.dll', 'msvcp140.dll']
+    
+    for dll_name in dlls_to_check:
+        try:
+            # 首先检查bin目录中是否存在该DLL
+            dll_path = os.path.join(bin_dir, dll_name)
+            if os.path.exists(dll_path):
+                logging.info(f"在bin目录找到 {dll_name}")
+            else:
+                logging.warning(f"bin目录中未找到 {dll_name}")
+                continue
+                
+            # 尝试直接加载bin目录中的DLL
+            try:
+                dll = ctypes.CDLL(dll_path)
+                logging.info(f"成功加载 {dll_path}")
+            except Exception as e:
+                error_code = get_last_error()
+                logging.error(f"加载 {dll_path} 失败: {e} (错误码: {error_code})")
+                
+            # 尝试通过LoadLibrary加载
+            try:
+                handle = ctypes.windll.kernel32.LoadLibraryW(dll_path)
+                if handle:
+                    path_buffer = ctypes.create_unicode_buffer(1024)
+                    ctypes.windll.kernel32.GetModuleFileNameW(handle, path_buffer, 1024)
+                    actual_path = path_buffer.value
+                    logging.info(f"{dll_name} 实际加载位置: {actual_path}")
+                else:
+                    error_code = get_last_error()
+                    logging.error(f"LoadLibrary失败 {dll_name}: 错误码 {error_code}")
+            except Exception as e:
+                logging.error(f"检查 {dll_name} 加载位置时出错: {e}")
+                
+        except Exception as e:
+            logging.error(f"处理 {dll_name} 时出错: {e}")
+            
+    # 列出bin目录中的所有文件
+    try:
+        files = os.listdir(bin_dir)
+        logging.info(f"bin目录内容: {files}")
+    except Exception as e:
+        logging.error(f"无法列出bin目录内容: {e}")
 
 def stop_transcription():
     """停止转录"""
@@ -592,7 +677,8 @@ def start_transcription():
         
         # 运行转录
         logging.info("开始转录...")
-        result = run_whisper_cpp(audio_file_to_use, model_path_var.get(), language_var.get(), translate_var.get(), output_format)
+        result, error_info = run_whisper_cpp(audio_file_to_use, model_path_var.get(), 
+                                           language_var.get(), translate_var.get(), output_format)
         
         if result and 'transcription' in result:
             logging.info("转录完成，准备保存结果")
@@ -602,19 +688,36 @@ def start_transcription():
                 logging.info("转录完成并保存")
                 update_progress_bar(100)
                 reset_buttons()
+                messagebox.showinfo("完成", "转录已完成！")
             root.after(0, save_and_finish)
         else:
-            logging.error("转录失败: 未检测到有效的分段信息")
+            # 构建详细的错误信息
+            error_details = []
+            if error_info:
+                if 'returncode' in error_info:
+                    error_details.append(f"进程返回码: {error_info['returncode']}")
+                if 'stdout' in error_info:
+                    error_details.append(f"标准输出:\n{error_info['stdout']}")
+                if 'stderr' in error_info:
+                    error_details.append(f"错误输出:\n{error_info['stderr']}")
+                if 'error' in error_info:
+                    error_details.append(f"错误信息: {error_info['error']}")
+                if 'traceback' in error_info:
+                    error_details.append(f"错误堆栈:\n{error_info['traceback']}")
+            
+            error_msg = "转录失败\n\n" + "\n\n".join(error_details)
+            logging.error(error_msg)
+            
             def show_error():
-                messagebox.showerror("错误", "未检测到有效的分段信息")
+                messagebox.showerror("错误", error_msg)
                 reset_buttons()
             root.after(0, show_error)
     
     except Exception as e:
         logging.error("转录过程出错", exc_info=True)
-        error_msg = str(e)
+        error_msg = f"转录过程出错：{str(e)}\n\n详细错误：{traceback.format_exc()}"
         def show_error():
-            messagebox.showerror("错误", f"转录过程出错：{error_msg}")
+            messagebox.showerror("错误", error_msg)
             reset_buttons()
         root.after(0, show_error)
     
@@ -633,13 +736,11 @@ def start_transcription():
 def extract_audio_from_video(video_file):
     """从视频文件提取音频并转换为16kHz WAV"""
     try:
-        # 创建临时目录
-        temp_dir = os.path.join(os.path.dirname(video_file), "temp")
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-        
-        # 生成临时音频文件路径
-        temp_audio = os.path.join(temp_dir, f"temp_audio_{int(time.time())}.wav")
+        # 使用系统临时目录
+        temp_audio = os.path.join(
+            tempfile.gettempdir(),
+            f"whisper_temp_{int(time.time())}_{os.path.basename(video_file)}.wav"
+        )
         
         # 获取ffmpeg路径
         ffmpeg_path = get_ffmpeg_path()
@@ -664,6 +765,11 @@ def extract_audio_from_video(video_file):
         
         if result.returncode != 0:
             logging.error(f"音频提取失败: {result.stderr}")
+            if os.path.exists(temp_audio):
+                try:
+                    os.remove(temp_audio)
+                except:
+                    pass
             return None
             
         logging.info(f"音频提取成功: {temp_audio}")
@@ -671,6 +777,11 @@ def extract_audio_from_video(video_file):
         
     except Exception as e:
         logging.error(f"视频处理出错: {e}")
+        if os.path.exists(temp_audio):
+            try:
+                os.remove(temp_audio)
+            except:
+                pass
         return None
 
 def browse_model():
@@ -793,7 +904,7 @@ def save_settings():
             # 打包环境
             settings_dir = os.path.join(os.path.dirname(sys.executable), 'config')
         else:
-            # 开��环境
+            # 开环境
             settings_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             
         # 确保配置目录存在

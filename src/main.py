@@ -15,7 +15,7 @@ from updater import Updater
 import logging
 import traceback
 import tempfile
-
+import platform
 # 在文件开头定义全局变量
 audio_file_var = None
 model_path_var = None
@@ -381,9 +381,9 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
                     # 立即检查进程状态
             time.sleep(0.1)
             if current_process.poll() is not None:
-                error_code = process.returncode
-                error_output = process.stderr.read() if process.stderr else ""
-                output = process.stdout.read() if process.stdout else ""
+                error_code = current_process.returncode
+                error_output = current_process.stderr.read() if current_process.stderr else ""
+                output = current_process.stdout.read() if current_process.stdout else ""
                 
                 error_info = {
                     'code': error_code,

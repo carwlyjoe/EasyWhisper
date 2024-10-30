@@ -358,7 +358,8 @@ def run_whisper_cpp(audio_file, model_path, language, translate, output_format):
                 "-f", audio_file_norm,
                 "--output-json", json_file_path,
                 "-l", languages[language],
-                "--print-progress"
+                "--print-progress",
+                "-ml", "60"
             ]
             
             print(f"执行命令: {' '.join(cmd)}")
@@ -505,45 +506,45 @@ def format_timestamp(seconds):
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 def save_transcription(transcription, output_file):
-    """保存转录结果"""
     try:
-        # 确保输出目录存在
-        output_dir = os.path.dirname(output_file)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            
-        logging.info(f"准备保存转录结果到: {output_file}")
-        
-        # 检查文件扩展名
         ext = os.path.splitext(output_file)[1].lower()
+        content = ""
         
-        # 根据不同格式处理转录内容
-        if isinstance(transcription, list):
-            if ext == '.srt':
-                # SRT 格式
-                content = ""
-                for i, segment in enumerate(transcription, 1):
-                    start_time = format_timestamp(segment.get('start', 0))
-                    end_time = format_timestamp(segment.get('end', 0))
-                    # 将繁体转换为简体
-                    text = convert(segment.get('text', '').strip(), 'zh-cn')
-                    content += f"{i}\n{start_time} --> {end_time}\n{text}\n\n"
-            elif ext == '.txt':
-                # 纯文本格式，将所有文本转换为简体
-                content = "\n".join(convert(segment.get('text', '').strip(), 'zh-cn') 
-                                  for segment in transcription)
-            else:
-                # JSON 格式，转换所有文本为简体
-                simplified_transcription = []
-                for segment in transcription:
-                    simplified_segment = segment.copy()
-                    simplified_segment['text'] = convert(segment.get('text', ''), 'zh-cn')
-                    simplified_transcription.append(simplified_segment)
-                content = json.dumps(simplified_transcription, ensure_ascii=False, indent=2)
+        if isinstance(transcription, dict):
+            segments = transcription.get('transcription', [])
+        elif isinstance(transcription, list):
+            segments = transcription
         else:
-            # 如果不是列表，直接转换为简体
-            content = convert(str(transcription), 'zh-cn')
+            segments = []
             
+        logging.debug(f"转录段落数量: {len(segments)}")
+        
+        if ext == '.srt':
+            for i, segment in enumerate(segments, 1):
+                # 从新的 JSON 结构中获取时间戳
+                timestamps = segment.get('timestamps', {})
+                start_time = timestamps.get('from', '00:00:00,000')
+                end_time = timestamps.get('to', '00:00:00,000')
+                                
+                text = convert(segment.get('text', '').strip(), 'zh-cn')
+                content += f"{i}\n{start_time} --> {end_time}\n{text}\n\n"
+                
+                
+        elif ext == '.txt':
+            # 纯文本格式，将所有文本转换为简体
+            content = "\n".join(convert(segment.get('text', '').strip(), 'zh-cn') 
+                              for segment in segments)
+                              
+        else:
+            # JSON 格式，转换所有文本为简体
+            simplified_segments = []
+            for segment in segments:
+                simplified_segment = segment.copy()
+                simplified_segment['text'] = convert(segment.get('text', ''), 'zh-cn')
+                simplified_segments.append(simplified_segment)
+            content = json.dumps({'transcription': simplified_segments}, 
+                               ensure_ascii=False, indent=2)
+        
         # 写入文件
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(content)

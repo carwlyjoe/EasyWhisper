@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyWhisper</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>EasyWhisper</h1>
+      <p>基于Whisper.cpp的语音转文字工具</p>
+    </header>
+    
+    <main>
+      <div class="card">
+        <div class="form-group">
+          <label for="audio-file">音频/视频文件</label>
+          <div class="input-group">
+            <input type="text" id="audio-file" readonly placeholder="选择音频或视频文件">
+            <button id="browse-file" class="btn">浏览</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="model-path">模型文件</label>
+          <div class="input-group">
+            <select id="model-path">
+              <option value="">-- 选择模型文件 --</option>
+            </select>
+            <button id="browse-model" class="btn">浏览</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="language">语言</label>
+          <select id="language">
+            <option value="zh">中文 (zh)</option>
+            <option value="en">英语 (en)</option>
+            <option value="ja">日语 (ja)</option>
+            <option value="ko">韩语 (ko)</option>
+            <option value="fr">法语 (fr)</option>
+            <option value="de">德语 (de)</option>
+            <option value="es">西班牙语 (es)</option>
+            <option value="it">意大利语 (it)</option>
+            <option value="ru">俄语 (ru)</option>
+            <option value="pt">葡萄牙语 (pt)</option>
+            <option value="nl">荷兰语 (nl)</option>
+            <option value="pl">波兰语 (pl)</option>
+            <option value="tr">土耳其语 (tr)</option>
+            <option value="ar">阿拉伯语 (ar)</option>
+            <option value="hi">印地 (hi)</option>
+            <option value="th">泰语 (th)</option>
+            <option value="vi">越南语 (vi)</option>
+            <option value="id">印尼语 (id)</option>
+            <option value="ms">马来语 (ms)</option>
+            <option value="el">希腊语 (el)</option>
+            <option value="sv">瑞典语 (sv)</option>
+            <option value="cs">捷克语 (cs)</option>
+            <option value="da">丹麦语 (da)</option>
+            <option value="fi">芬兰语 (fi)</option>
+          </select>
+        </div>
+        
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="translate">
+            翻译为英语
+          </label>
+        </div>
+        
+        <div class="form-group">
+          <label for="output-dir">输出目录</label>
+          <div class="input-group">
+            <input type="text" id="output-dir" readonly placeholder="选择输出目录">
+            <button id="browse-output" class="btn">浏览</button>
+          </div>
+        </div>
+        
+        <div class="form-group radio-group">
+          <label>输出格式:</label>
+          <label>
+            <input type="radio" name="output-format" value=".srt" checked>
+            SRT 字幕
+          </label>
+          <label>
+            <input type="radio" name="output-format" value=".txt">
+            纯文本
+          </label>
+        </div>
+        
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="enable-vad" checked>
+            启用智能字幕优化（在静音区间不显示字幕）
+          </label>
+        </div>
+        
+        <div class="form-group" id="vad-threshold-container">
+          <label for="vad-threshold">优化强度</label>
+          <div class="range-container">
+            <input type="range" id="vad-threshold" min="0" max="100" value="50">
+            <span id="vad-threshold-value">0.5</span>
+          </div>
+          <small>值越高，字幕之间的间隔越明显，静音区间越多</small>
+        </div>
+        
+        <div class="form-group">
+          <div class="progress-container">
+            <div class="progress-bar" id="progress-bar">
+              <div class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text">0%</div>
+          </div>
+        </div>
+        
+        <div class="button-group">
+          <button id="start-button" class="btn primary">开始转录</button>
+          <button id="stop-button" class="btn danger" disabled>停止</button>
+        </div>
+      </div>
+      
+      <div class="card transcript-card">
+        <h2>转录结果预览</h2>
+        <div id="transcript-preview" class="transcript-preview"></div>
+      </div>
+    </main>
+    
+    <footer>
+      <p>基于 <a href="https://github.com/ggerganov/whisper.cpp" target="_blank">Whisper.cpp</a> 开发</p>
+    </footer>
+  </div>
+  
+  <script src="renderer.js"></script>
+</body>
+</html> 

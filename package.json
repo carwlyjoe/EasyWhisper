@@ -1,0 +1,49 @@
+{
+  "name": "easy-whisper",
+  "version": "1.0.0",
+  "description": "基于Whisper.cpp的语音转文字工具，支持多种音视频格式转录",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": [
+    "whisper",
+    "speech-to-text",
+    "transcription"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-log": "^5.1.1",
+    "electron-store": "^8.2.0",
+    "fluent-ffmpeg": "^2.1.2"
+  },
+  "build": {
+    "appId": "com.easywhisper.app",
+    "productName": "EasyWhisper",
+    "files": [
+      "**/*",
+      "!model/*",
+      "!bin/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+} 

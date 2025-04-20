@@ -1,0 +1,14 @@
+{
+    "model_paths": [
+        "D:/model\\ggml-base.bin",
+        "D:/model\\ggml-large-v3-q5_0.bin",
+        "D:/model\\ggml-large-v3-turbo.bin",
+        "D:/model\\ggml-large-v3.bin",
+        "D:/model\\ggml-tiny.bin"
+    ],
+    "last_model_path": "D:/model/ggml-base.bin",
+    "last_model_dir": "D:/model",
+    "last_output_format": ".srt",
+    "last_output_dir": "D:/视频/blackmyth",
+    "last_media_dir": "D:/视频/blackmyth"
+}

@@ -1,6 +1,6 @@
 # EasyWhisper
 
-一个基于 [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) 的语音转文字工具，提供图形界面，支持多种音视频格式转录。
+一个基于 [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) 的语音转文字工具，使用Electron开发，提供现代化图形界面，支持多种音视频格式转录。
 
 ## 功能特点
 
@@ -8,7 +8,7 @@
   - 音频：WAV、MP3、M4A、FLAC
   - 视频：MP4、AVI、MKV、MOV
 - 支持输出为 SRT 字幕文件或纯文本
-- 简单易用的图形界面
+- 美观易用的图形界面
 - 实时显示转录进度
 
 ## 使用前准备
@@ -23,12 +23,13 @@
    ```
    如果显示版本信息，则表示安装成功
 
-### 2. 安装 Python
+### 2. 安装 Node.js
 
-1. 从 [Python 官网](https://www.python.org/downloads/) 下载并安装 Python 3.x
+1. 从 [Node.js 官网](https://nodejs.org/) 下载并安装 Node.js (推荐使用 LTS 版本)
 2. 验证安装：
    ```bash
-   python --version
+   node --version
+   npm --version
    ```
    如果显示版本信息，则表示安装成功
 
@@ -39,11 +40,11 @@
    - 建议新手先尝试 `ggml-base.bin` 或 `ggml-small.bin`
    - 更大的模型（如 medium、large）准确度更高但速度更慢
 
-### 4. 安装 EasyWhisper
+### 4. 安装和运行 EasyWhisper
 
 1. 克隆仓库：
    ```bash
-   git clone https://github.com/carwlyjoe/EasyWhisper.git
+   git clone https://github.com/your-username/EasyWhisper.git
    ```
 
 2. 进入项目目录：
@@ -53,26 +54,34 @@
 
 3. 安装依赖：
    ```bash
-   pip install -r requirements.txt
+   npm install
    ```
-   国内用户可使用镜像加速：
+   
+4. 启动应用：
    ```bash
-   pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+   npm start
    ```
+   或者直接双击 `启动.bat`
 
 ## 使用方法
 
-1. 双击运行 `启动.bat`
-2. 在打开的界面中：
+1. 启动应用
+2. 在界面中：
    - 选择要转录的音频或视频文件
    - 选择下载好的模型文件
    - 设置输出文件的保存位置和格式
 3. 点击"开始转录"
 4. 等待进度条完成即可获得转录结果
 
-## 界面预览
+## 打包应用
 
-![EasyWhisper 界面](https://github.com/user-attachments/assets/76ceecff-0c5b-4fc8-ae36-2acd33ad2c0e)
+如果你想将应用打包为可执行文件，可以使用以下命令：
+
+```bash
+npm run build
+```
+
+打包后的文件将位于 `dist` 目录中。
 
 ## 注意事项
 
